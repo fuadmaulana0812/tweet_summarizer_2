@@ -1,0 +1,4 @@
+.env
+*.ipynb
+output_tweets.txt
+*__pycache__

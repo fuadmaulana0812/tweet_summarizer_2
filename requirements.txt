@@ -1,0 +1,11 @@
+asyncio
+openai
+langchain
+langchain_openai
+selenium
+pydantic-settings
+schedule
+webdriver-manager
+pandas
+requests
+openpyxl
