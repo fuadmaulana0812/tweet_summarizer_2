@@ -8,7 +8,7 @@ async def process_tweets(tweet_data, start_datetime, end_datetime):
     hours = (end_datetime - start_datetime).seconds // 3600
 
     # ✅ Header
-    output = f"Desci Updates in last {hours} hours ({start_datetime.strftime('%d %B %Y %H:%M')} – {end_datetime.strftime('%H:%M')})\n\n"
+    output = f"BioDAO Updates in last {hours} hours ({start_datetime.strftime('%d %B %Y %H:%M')} – {end_datetime.strftime('%H:%M')})\n\n"
 
     for account, tweets in tweet_data.items():
         for tweet in tweets:

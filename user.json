@@ -98,5 +98,10 @@
         "name": "MycoDAO",
         "username": "MycoDAO",
         "twitter": "https://twitter.com/MycoDAO"
+    },
+    {
+        "name": "ReflexDAO",
+        "username": "ReflexDAO",
+        "twitter": "https://twitter.com/ReflexDAO"
     }
 ]

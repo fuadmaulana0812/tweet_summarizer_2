@@ -44,12 +44,21 @@ class TwitterSelenium:
 
     def login(self):
         self.driver.get("https://twitter.com/login")
-        time.sleep(3)
+        time.sleep(5)
         try:
             username_field = WebDriverWait(self.driver, 10).until(EC.presence_of_element_located((By.NAME, "text")))
             username_field.send_keys(self.username)
             username_field.send_keys(Keys.RETURN)
-            time.sleep(3)
+            time.sleep(5)
+
+            # Check if Twitter asks for email
+            try:
+                email_field = WebDriverWait(self.driver, 5).until(EC.presence_of_element_located((By.NAME, "text")))
+                email_field.send_keys(settings.TWITTER_EMAIL)  # Use email from settings
+                email_field.send_keys(Keys.RETURN)
+                time.sleep(5)
+            except:
+                print("✅ Email step not required.")
 
             password_field = WebDriverWait(self.driver, 10).until(EC.presence_of_element_located((By.NAME, "password")))
             password_field.send_keys(self.password)
