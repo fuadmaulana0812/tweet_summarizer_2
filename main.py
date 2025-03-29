@@ -1,50 +1,64 @@
 import asyncio
 import schedule
-from scraper.selenium_scraper import *
-from summarizer.summarize_tweets_openai import *
-# from summarizer.summarize_tweets_hugging import *
+from scraper.selenium_scraper import TwitterSelenium
+from summarizer.summarize_tweets_openai import process_tweets
 from utils.telegram import Telegram
 from utils.utils import read_user
+import logging
+import time
+from datetime import datetime, timedelta, timezone
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 async def job():
-    print("🔄 Running Scheduled Task...")
+    """
+    The main scheduled task that performs the following steps:
+    1. Reads Twitter accounts from the user.json file.
+    2. Scrapes tweets using Selenium.
+    3. Processes tweets using OpenAI's language model.
+    4. Posts the processed tweets as a thread on Twitter.
+    5. Sends the processed tweets to a Telegram group.
+
+    Returns:
+        None
+    """
+    logging.info("🔄 Running Scheduled Task...")
 
     # ✅ Get current time 
     time_loc = timezone(timedelta(hours=-5))
     end_datetime = datetime.now(time_loc)
     start_datetime = end_datetime - timedelta(hours=6)
-    # start_datetime = datetime(2025, 3, 22, 19, 0, 0, tzinfo=time_loc)
-    # end_datetime = datetime(2025, 3, 23, 0, 0, 0, tzinfo=time_loc)
+    logging.info(f"Processing tweets from {start_datetime} to {end_datetime}.")
     
-    # ✅ Read Twitter accounts from Excel file
-    user_list = await read_user()
-    print(user_list[:3])
+    try:
+        # ✅ Read Twitter accounts from Excel file
+        user_list = await read_user()
 
-    # ✅ Initialize Selenium Scraper
-    selenium_scraper = TwitterSelenium(start_datetime, end_datetime)
-    selenium_scraper.setup_driver()
+        # ✅ Initialize Selenium Scraper
+        selenium_scraper = TwitterSelenium(start_datetime, end_datetime)
+        selenium_scraper.setup_driver()
 
-    if selenium_scraper.login():
-        # ✅ Scrape tweets
-        print("🔍 Scraping tweets...")
-        tweets_data = await selenium_scraper.scrape_tweets(user_list)
-        # print(tweets_data)
+        if selenium_scraper.login():
+            # ✅ Scrape tweets
+            tweets_data = await selenium_scraper.scrape_tweets(user_list)
 
-        # ✅ Process tweets (Assuming `process_tweets` is an async function)
-        print("🔍 Processing tweets...")
-        formatted_tweets = await process_tweets(tweets_data, start_datetime, end_datetime)
-        print(formatted_tweets)
+            # ✅ Process tweets 
+            formatted_tweets = await process_tweets(tweets_data, start_datetime, end_datetime)
+            print(formatted_tweets)
 
-        # ✅ Post a Twitter thread
-        print("🔍 Posting tweets...")
-        await selenium_scraper.post_tweet(formatted_tweets)
+            # ✅ Post a Twitter tweet
+            await selenium_scraper.post_tweet(formatted_tweets)
 
-        # ✅ Post to Telegram channel
-        print("🔍 Posting to Telegram...")
-        telegram = Telegram()
-        await telegram.send_telegram_message(formatted_tweets)
+            # ✅ Post to Telegram channel
+            telegram = Telegram()
+            await telegram.send_telegram_message(formatted_tweets)
 
-    selenium_scraper.driver.quit()  # Close browser
+        selenium_scraper.driver.quit()  # Close browser
+        logging.info("✅ Scheduled task completed successfully.")
+
+    except Exception as e:
+        logging.error(f"❌ An error occurred during the scheduled task: {e}")
 
 # asyncio.run(job())
 
@@ -54,7 +68,7 @@ schedule.every().day.at("11:00").do(lambda: asyncio.run(job()))
 schedule.every().day.at("17:00").do(lambda: asyncio.run(job()))
 schedule.every().day.at("23:00").do(lambda: asyncio.run(job()))
 
-print("🕒 Scheduler started! Running job every 6 hours...")
+logging.info("🕒 Scheduler started! Running job every 6 hours...")
 
 # ✅ Run the scheduler
 while True:

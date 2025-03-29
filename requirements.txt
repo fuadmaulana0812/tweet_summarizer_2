@@ -6,6 +6,4 @@ selenium
 pydantic-settings
 schedule
 webdriver-manager
-pandas
 requests
-openpyxl

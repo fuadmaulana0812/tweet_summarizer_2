@@ -1,55 +1,68 @@
-import openai
+import logging
 from datetime import datetime
 from config.settings import settings
 from langchain_openai import ChatOpenAI
 
+# Configure logging
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+
 async def process_tweets(tweet_data, start_datetime, end_datetime):
-    # ✅ Calculate the number of hours between start and end
-    hours = (end_datetime - start_datetime).seconds // 3600
+    """
+    Processes and summarizes tweets using OpenAI's language model.
 
-    # ✅ Header
-    output = f"BioDAO Updates in last {hours} hours ({start_datetime.strftime('%d %B %Y %H:%M')} – {end_datetime.strftime('%H:%M')})\n\n"
+    Args:
+        tweet_data (dict): A dictionary containing tweet data. 
+                           Keys are account names, and values are lists of tweets.
+        start_datetime (datetime): The start datetime for the tweet range.
+        end_datetime (datetime): The end datetime for the tweet range.
 
-    for account, tweets in tweet_data.items():
-        for tweet in tweets:
-            tweet_text = tweet["tweet"]
-            tweet_url = tweet["url"]
+    Returns:
+        str: A formatted string containing summarized tweets.
+    """
+    try:
+        # ✅ Calculate the number of hours between start and end
+        hours = (end_datetime - start_datetime).seconds // 3600
+        logging.info(f"Processing tweets for the last {hours} hours.")
 
-            # ✅ Summarize the tweet (if it's too long)
-            print("Using OpenAI to summarize the tweet")
-            llm = ChatOpenAI(
-                api_key=settings.OPENAI_API_KEY,
-                model="gpt-4o-mini",
-                temperature=0.5,
-            )
-            messages = [
-                (
-                    "system",
-                    "You are a helpful assistant that summarizes tweets"
-                ),
-                (
-                    "user",
-                    f"Summarize this tweet in a concise way: {tweet_text}"
+        # ✅ Header for the output
+        output = f"BioDAO Updates in last {hours} hours ({start_datetime.strftime('%d %B %Y %H:%M')} – {end_datetime.strftime('%H:%M')})\n\n"
+
+        for account, tweets in tweet_data.items():
+            logging.info(f"Processing tweets for account: {account}")
+            for tweet in tweets:
+                tweet_text = tweet["tweet"]
+                tweet_url = tweet["url"]
+
+                # ✅ Summarize the tweet using OpenAI
+                logging.info("Using OpenAI to summarize the tweet.")
+                llm = ChatOpenAI(
+                    api_key=settings.OPENAI_API_KEY,
+                    model=settings.OPENAI_MODEL,
+                    temperature=0.5,
                 )
-            ]
-            response = llm.invoke(messages)
-            summary = response.content
+                messages = [
+                    (
+                        "system",
+                        "You are a helpful assistant that summarizes tweets"
+                    ),
+                    (
+                        "user",
+                        f"Summarize this tweet in a concise way: {tweet_text}"
+                    )
+                ]
 
-            # ✅ Format the output
-            output += f"* {account}\n{summary}\nOriginal tweet: {tweet_url}\n\n"
+                try:
+                    response = llm.invoke(messages)
+                    summary = response.content
+                    logging.info("Tweet summarized successfully.")
+                except Exception as e:
+                    logging.error(f"Error summarizing tweet: {e}")
 
-    return output.strip()
+                # ✅ Format the output
+                output += f"* {account}\n{summary}\nOriginal tweet: {tweet_url}\n\n"
 
-# if __name__ == "__main__":
-#     # ✅ Example usage
-#     tweet_data = {
-#         "elonmusk": [
-#             {
-#                 "tweet": "🤯 Rare Diseases = $1T+ market\n\n♻️ Drug Repurposing is the training set for AI Drug Discovery\n\n💊 Medicines are within reach\n\n🚶Kiddos are taking their first steps\n\n👀 Just watch the before vs after reel\n\n🚀 Turn crypto into $CURES moonshots\n\n🚨 AUCTION CLOSES IN 24 HOURS",
-#                 "url": "https://twitter.com/elonmusk/status/1444645826638456321"
-#             }
-#         ]
-#     }
-#     start_datetime = datetime(2021, 10, 4, 12, 0)
-#     end_datetime = datetime(2021, 10, 4, 13, 0)
-#     print(process_tweets(tweet_data, start_datetime, end_datetime))
+        logging.info("Tweet processing completed successfully.")
+        return output.strip()
+    
+    except Exception as e:
+        logging.error(f"An error occurred while processing tweets: {e}")

@@ -9,9 +9,22 @@ from webdriver_manager.chrome import ChromeDriverManager
 from datetime import datetime, timezone, timedelta
 import time
 from config.settings import settings
-import textwrap
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 class TwitterSelenium:
+    """
+    A class to interact with Twitter using Selenium for tasks such as login, scraping tweets, and posting tweets.
+
+    Attributes:
+        start_datetime (datetime): The start date and time for filtering tweets.
+        end_datetime (datetime): The end date and time for filtering tweets.
+        username (str): The Twitter username for login.
+        password (str): The Twitter password for login.
+        driver (webdriver.Chrome): The Selenium WebDriver instance.
+    """
     def __init__(self, start_datetime, end_datetime):
         self.start_datetime = start_datetime
         self.end_datetime = end_datetime
@@ -20,7 +33,10 @@ class TwitterSelenium:
         self.driver = None
 
     def setup_driver(self):
-        print("🚀 Initializing web driver...")
+        """
+        Initializes the Selenium WebDriver with the required options.
+        """
+        logging.info("🚀 Initializing web driver...")
         options = Options()
         options.add_argument("--headless")  
         options.add_argument("--no-sandbox")  
@@ -40,9 +56,16 @@ class TwitterSelenium:
         options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.5735.90 Safari/537.36")
         self.driver = webdriver.Chrome(service=Service("/usr/local/bin/chromedriver"), options=options)
         # self.driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
-        print("✅ Web driver initialized!")
+        logging.info("✅ Web driver initialized!")
 
     def login(self):
+        """
+        Logs into Twitter using the provided username and password.
+
+        Returns:
+            bool: True if login is successful, False otherwise.
+        """
+        logging.info("🔑 Attempting to log in to Twitter...")
         self.driver.get("https://twitter.com/login")
         time.sleep(5)
         try:
@@ -58,33 +81,41 @@ class TwitterSelenium:
                 email_field.send_keys(Keys.RETURN)
                 time.sleep(5)
             except:
-                print("✅ Email step not required.")
+                logging.info("✅ Email step not required.")
 
             password_field = WebDriverWait(self.driver, 10).until(EC.presence_of_element_located((By.NAME, "password")))
             password_field.send_keys(self.password)
             password_field.send_keys(Keys.RETURN)
             time.sleep(5)
-            print("✅ Logged in successfully!")
-        except:
-            print("❌ Login failed!")
+            logging.info("✅ Logged in successfully!")
+            return True
+        except Exception as e:
+            logging.error(f"❌ Login failed: {e}")
             self.driver.quit()
             return False
-        return True
 
     async def scrape_tweets(self, users):
-        """Scrape tweets from multiple users."""
+        """
+        Scrapes tweets from the specified users within the date range.
+
+        Args:
+            users (list or str): A list of Twitter usernames or a single username.
+
+        Returns:
+            dict: A dictionary containing tweets for each user.
+        """
         if isinstance(users, str):  # If only one user is given, convert it to a list
             users = [users]
 
+        logging.info("🔍 Starting tweet scraping...")
         all_tweets = {}
         time_loc = timezone(timedelta(hours=-5))
         seen_urls = set() # Track seen URLs to avoid duplicates
 
         for user in users:
-            print(f"🔍 Scraping tweets for @{user}...")
+            logging.info(f"🔍 Scraping tweets for @{user}...")
             self.driver.get(f"https://twitter.com/{user}")
             time.sleep(10)
-            # WebDriverWait(self.driver, 10).until(lambda d: d.execute_script("return document.readyState") == "complete")
             
             tweets = self.driver.find_elements(By.XPATH, '//article[@data-testid="tweet"]')
             user_tweets = []
@@ -104,13 +135,7 @@ class TwitterSelenium:
                     tweet_link_element = tweet.find_element(By.XPATH, './/a[contains(@href, "/status/")]')
                     tweet_link = tweet_link_element.get_attribute("href")
 
-                    if user not in tweet_link:
-                        print(f"⚠️ Skipping tweet not from @{user}: {tweet_link}")
-                        continue
-
-                    # Check if the URL is already processed
-                    if tweet_link in seen_urls:
-                        print(f"⚠️ Duplicate tweet found: {tweet_link}, skipping...")
+                    if user not in tweet_link or tweet_link in seen_urls:
                         continue
 
                     # Add the URL to the seen set
@@ -124,18 +149,27 @@ class TwitterSelenium:
                             "url": tweet_link
                         })
                 except Exception as e:
-                    print(f"❌ Error parsing tweet from @{user}: {e}")
+                    logging.error(f"❌ Error parsing tweet from @{user}: {e}")
             all_tweets[user] = user_tweets
 
+        logging.info("✅ Tweet scraping completed!")
         return all_tweets
     
     async def post_tweet(self, tweet_text):
-        """Function to post a tweet using Selenium."""
+        """
+        Posts a tweet using Selenium.
+
+        Args:
+            tweet_text (str): The text of the tweet to post.
+
+        Returns:
+            bool: True if the tweet is posted successfully, False otherwise.
+        """
         if not self.driver:
-            print("❌ Web driver not initialized. Call `setup_driver()` first.")
+            logging.error("❌ Web driver not initialized. Call `setup_driver()` first.")
             return False
 
-        print("✍️ Posting tweet...")
+        logging.info("✍️ Posting tweet...")
         try:
             self.driver.get("https://twitter.com/home")
             time.sleep(5)
@@ -153,60 +187,26 @@ class TwitterSelenium:
             )
             tweet_button.click()
 
-            print("✅ Tweet posted successfully!")
+            logging.info("✅ Tweet posted successfully!")
             return True
 
         except Exception as e:
-            print(f"❌ Error posting tweet: {e}")
+            logging.error(f"❌ Error posting tweet: {e}")
             return False
-
-    def post_tweet_reply(self, tweet_text, in_reply_to):
-        """Post a reply tweet in a thread."""
-        print(f"💬 Posting reply to {in_reply_to}...")
-        self.driver.get(f"https://twitter.com/intent/tweet?in_reply_to={in_reply_to}")
-        time.sleep(5)
-
-        try:
-            # Locate tweet box and enter text
-            tweet_box = WebDriverWait(self.driver, 10).until(
-                EC.presence_of_element_located((By.XPATH, '//div[@aria-label="Post text"]'))
-            )
-            tweet_box.send_keys(tweet_text)
-            time.sleep(2)
-
-            # Click the tweet button
-            tweet_button = WebDriverWait(self.driver, 10).until(
-                EC.element_to_be_clickable((By.XPATH, '//button[@data-testid="tweetButton"]'))
-            )
-            tweet_button.click()
-
-            print("✅ Reply posted successfully!")
-            return True
-
-        except Exception as e:
-            print(f"❌ Error posting reply: {e}")
-            return False
-    
-    def post_thread(self, full_text):
-        """Posts a thread if the text exceeds 280 characters."""
-        tweets = textwrap.wrap(full_text, width=270)  # Leave room for numbering
-        first_tweet_id = None
-
-        for index, tweet in enumerate(tweets):
-            numbered_tweet = f"{tweet} ({index+1}/{len(tweets)})"
-            print(numbered_tweet)
-
-            # ✅ If it's the first tweet, post normally
-            if index == 0:
-                tweet_id = self.post_tweet(numbered_tweet)  # Post first tweet
-                first_tweet_id = tweet_id
-            else:
-                self.post_tweet_reply(numbered_tweet, first_tweet_id)  # Reply to first tweet
 
     def run(self, users):
+        """
+        Runs the Selenium scraper to log in and scrape tweets.
+
+        Args:
+            users (list): A list of Twitter usernames to scrape tweets from.
+
+        Returns:
+            dict: A dictionary containing tweets for each user.
+        """
         self.setup_driver()
         if not self.login():
-            return []
+            return {}
         tweets = self.scrape_tweets(users)
         self.driver.quit()
         return tweets
